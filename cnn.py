@@ -1,6 +1,8 @@
 import pandas as pd 
 import torch 
 import torch.nn as nn 
+import os 
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 import torch.optim as optim 
 from torch.utils.data import Dataset, DataLoader, random_split
 from tqdm import tqdm
@@ -34,10 +36,10 @@ class PersonalityDataset(Dataset):
             'Openness': 4
         }
 
-       
+        # --- 이 부분이 핵심적인 변경 사항입니다 ---
         self.data_by_group = {} # 그룹 ID별 데이터 저장
         self.data = [] # 전체 데이터 (원본 그룹 ID 포함)
-        
+        # --- 여기까지 ---
 
         # 각 인격 특성 폴더 (Agreeableness, Conscientiousness 등)를 순회
         for trait, label in self.label_map.items():
@@ -55,19 +57,19 @@ class PersonalityDataset(Dataset):
                     # 원본 ID (폴더 이름)를 그룹 ID로 사용
                     group_id = original_id_folder_name 
                     
-                   
+                    # --- 이 부분이 핵심적인 변경 사항입니다 ---
                     if group_id not in self.data_by_group:
                         self.data_by_group[group_id] = []
-                    
+                    # --- 여기까지 ---
 
                     # 'nameX' 폴더 내부의 이미지 파일들을 순회
                     for fname in os.listdir(original_id_folder_path):
                         if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
                             fpath = os.path.join(original_id_folder_path, fname)
-                           
+                            # --- 이 부분이 핵심적인 변경 사항입니다 ---
                             self.data_by_group[group_id].append((fpath, label, group_id)) # 그룹 ID도 함께 저장
                             self.data.append((fpath, label, group_id)) # self.data에도 그룹 ID를 함께 저장
-                            
+                            # --- 여기까지 ---
 
         if not self.data:
             print(f"No image data loaded from {root_dir}. Please check the directory structure and file types.")
@@ -120,7 +122,7 @@ def train_and_valid(model, optimizer, loss_func, trainloader, validloader, epoch
     
     tr_loss_lst = [] 
     vl_loss_lst = []
-    vl_acc_lst = []
+    vl_acc_lst =[] 
     best_valid = float('inf ')
     for epoch in range(epochs): 
         model.train()
@@ -197,7 +199,7 @@ def loss_graph(train, valid, save_path="loss_curve_cnn.png"):
     
     plt.savefig(save_path)
     print(f"Loss graph saved to {save_path}")
-    
+
 def accuracy_graph(valid_accuracy, save_path="accuracy_curve_cnn.png"):
     epochs = range(1, len(valid_accuracy) + 1)
 
@@ -212,18 +214,20 @@ def accuracy_graph(valid_accuracy, save_path="accuracy_curve_cnn.png"):
     
     plt.savefig(save_path)
     print(f"Accuracy graph saved to {save_path}")
-
+    
 class PersonalClassifier(nn.Module):
     def __init__(self, in_channels=3, num_classes=5, dropout=0.2):
         super(PersonalClassifier, self).__init__()
 
         self.features = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),  # (B, 3, 224, 224) → (B, 32, 224, 224)
-            nn.ReLU(),
+            nn.GELU(),
+            nn.BatchNorm2d(32), 
             nn.MaxPool2d(2),  # → (B, 32, 112, 112)
 
             nn.Conv2d(32, 64, kernel_size=3, padding=1),  # → (B, 64, 112, 112)
-            nn.ReLU(),
+            nn.BatchNorm2d(64), 
+            nn.GELU(),
             nn.MaxPool2d(2),  # → (B, 64, 56, 56)
 
             # nn.Conv2d(64, 128, kernel_size=3, padding=1),
@@ -234,23 +238,25 @@ class PersonalClassifier(nn.Module):
         
         # self.classifier = nn.Sequential(
         #     nn.Flatten(),
-        #     nn.Linear(128*28*28, 256),
+        #     nn.Linear(64 * 56 * 56, 256),
         #     nn.ReLU(),
         #     nn.Dropout(dropout), 
         #     nn.Linear(256, num_classes)
         # ) 
         self.classifier = nn.Sequential(
             nn.Linear(64, 64), 
-            nn.ReLU(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(64, num_classes)
         )
         
+        # gelu, batchnorm, and aug 
+        
 
     def forward(self, x):
         x = self.features(x)
-        x = self.avgpool(x) 
-        x = torch.flatten(x, 1) 
+        x = self.avgpool(x) # GAP 적용
+        x = torch.flatten(x, 1) # (B, C, 1, 1) → (B, C)로 평탄화
         x = self.classifier(x)
         
         # x = self.features(x)
@@ -315,7 +321,7 @@ def test(model, optimizer, loss_func, testloader, dataset, device="cpu", save_pa
     return loss, accuracy
 
 if __name__ == "__main__":
-    path = "/Users/douyoung/Library/CloudStorage/GoogleDrive-douyoung@gmail.com/내 드라이브/1. 고려대학교/4학년/1학기/데이터과학/archive-2/augmented train"
+    path = "/home/aikusrv02/dialect/douyoung/cnn/archive-2/augmented train"
     dataset = PersonalityDataset(path)
     train_dataset, test_dataset = train_valid_split(dataset)
     
@@ -324,7 +330,7 @@ if __name__ == "__main__":
 
     model = PersonalClassifier()
     loss_func = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
     epochs = 50
     device = torch.device("cuda" if torch.cuda.is_available() else "mps")
 
@@ -341,12 +347,11 @@ if __name__ == "__main__":
 
     loss_graph(train_loss, valid_loss) # saving loss graph 
     accuracy_graph(valid_accuracy) # save acc graph 
-    
 
     # 저장된 가중치 로드
     model.load_state_dict(torch.load("personality_cnn.pt"))
     # Evaluating phase 
-    test_csv = "/Users/douyoung/Library/CloudStorage/GoogleDrive-douyoung@gmail.com/내 드라이브/1. 고려대학교/4학년/1학기/데이터과학/archive-2/augmented test"
+    test_csv = "/home/aikusrv02/dialect/douyoung/cnn/archive-2/augmented test"
     testset = PersonalityDataset(test_csv)
     testloader = DataLoader(testset, batch_size=32, shuffle=False)
 
