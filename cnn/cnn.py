@@ -324,7 +324,7 @@ if __name__ == "__main__":
 
     model = PersonalClassifier()
     loss_func = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     epochs = 50
     device = torch.device("cuda" if torch.cuda.is_available() else "mps")
 
