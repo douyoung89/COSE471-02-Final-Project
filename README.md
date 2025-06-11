@@ -1,5 +1,5 @@
 # Handwriting Personality Prediction
-This project develops deep learning models to predict the “Big Five” personality traits (Agreeableness, Conscientiousness, Extraversion, Neuroticism, Openness) using handwriting images. We explore two main approaches: a Convolutional Neural Network (CNN) trained from scratch and a Transfer Learning approach utilizing a pre-trained ResNet model.
+This project develops deep learning models to predict the “Big Five” personality traits (Agreeableness, Conscientiousness, Extraversion, Neuroticism, Openness) using handwriting images. We explore two main approaches: a Convolutional Neural Network (CNN) trained from scratch and a Transfer Learning approach utilizing a pre-trained ResNet model. Our weight and report are in : [google drive](https://drive.google.com/drive/folders/15rN2wU2jW00ZsWvquwiO0VUGMC1KLgou?usp=sharing)
 
 # Project Structure
     .
