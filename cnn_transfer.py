@@ -21,8 +21,8 @@ class PersonalityDataset(Dataset):
         self.root_dir = root_dir
         self.transform = transform or transforms.Compose([
             transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(10),
+            # transforms.RandomHorizontalFlip(),
+            # transforms.RandomRotation(10),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
@@ -141,6 +141,7 @@ def train_and_valid(model, optimizer, loss_func, trainloader, validloader, epoch
 
     tr_loss_lst = []
     vl_loss_lst = []
+    vl_acc_lst = []
     best_valid = float('inf')
     patience_counter = 0 
     for epoch in range(epochs):
@@ -178,6 +179,7 @@ def train_and_valid(model, optimizer, loss_func, trainloader, validloader, epoch
         val_loss = val_loss / len(validloader)
         vl_loss_lst.append(val_loss)
         accuracy = correct / total
+        vl_acc_lst.append(accuracy)
 
 
         print(f"""Epoch {epoch + 1}/{epochs} Train Loss: {train_loss:.4f} Valid Loss: {val_loss:.4f}""")
@@ -199,7 +201,7 @@ def train_and_valid(model, optimizer, loss_func, trainloader, validloader, epoch
                 print()
                 break
 
-    return tr_loss_lst, vl_loss_lst
+    return tr_loss_lst, vl_loss_lst, vl_acc_lst 
 
 # loss_graph 함수는 동일하게 유지
 def loss_graph(train, valid, save_path="loss_curve_cnn.png"):
@@ -217,13 +219,27 @@ def loss_graph(train, valid, save_path="loss_curve_cnn.png"):
 
     plt.savefig(save_path)
     print(f"Loss graph saved to {save_path}")
+    
+def accuracy_graph(valid_accuracy, save_path="accuracy_curve_cnn.png"):
+    epochs = range(1, len(valid_accuracy) + 1)
 
-# --- 전이 학습을 위한 모델 정의 (PersonalClassifier 대신) ---
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, valid_accuracy, label='Validation Accuracy', marker='o', color='green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Validation Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    
+    plt.savefig(save_path)
+    print(f"Accuracy graph saved to {save_path}")
+    
 class TransferLearningModel(nn.Module):
     def __init__(self, num_classes=5):
         super(TransferLearningModel, self).__init__()
-        # 사전 학습된 ResNet-18 모델 로드
-        self.resnet = models.resnet50(pretrained=True)
+        
+        self.resnet = models.resnet18(pretrained=True)
 
         # ResNet의 모든 파라미터를 고정 (feature extractor)
         for param in self.resnet.parameters():
@@ -236,9 +252,6 @@ class TransferLearningModel(nn.Module):
         # ResNet-18의 마지막 FC 레이어의 입력 특징(in_features)을 확인
         num_ftrs = self.resnet.fc.in_features
         self.resnet.fc = nn.Sequential(
-            nn.Dropout(0.3), # 여기에 드롭아웃 추가
-            nn.Linear(num_ftrs, num_ftrs), 
-            nn.GELU(), 
             nn.Dropout(0.3), # 여기에 드롭아웃 추가
             nn.Linear(num_ftrs, num_classes) 
         )
@@ -319,24 +332,23 @@ if __name__ == "__main__":
     # 전이 학습에서는 새로 추가된 FC 레이어의 파라미터만 학습시키는 것이 일반적
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.001) # ResNet의 FC 레이어만 학습
 
-    epochs = 20
+    epochs = 10
     device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
     print(f"Using device: {device}")
 
 
-    train_loss, valid_loss = train_and_valid(model=model,
+    train_loss, valid_loss, acc = train_and_valid(model=model,
                                             optimizer=optimizer,
                                             loss_func=loss_func,
                                             trainloader=train_loader,
                                             validloader=valid_loader,
                                             epochs=epochs,
                                             device=device,
-                                            save_path = "./personality_transfer_learning.pt", # 저장 경로 변경
-                                            early_stopping_limit=5 
+                                            save_path = "./personality_transfer_learning.pt" # 저장 경로 변경
                                             )
 
     loss_graph(train_loss, valid_loss, save_path="loss_curve_transfer_learning.png") # 그래프 저장 경로 변경
-
+    accuracy_graph(acc)
 
     # 저장된 가중치 로드
     model.load_state_dict(torch.load("personality_transfer_learning.pt"))
