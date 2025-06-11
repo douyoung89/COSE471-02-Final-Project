@@ -66,11 +66,11 @@ This is a Convolutional Neural Network model trained from scratch.
 
 ### Architecture:
 
-Two convolutional layers with ReLU activation and MaxPool2d layers.
+Two convolutional layers with GELU activation, MaxPool2d layers and Batchnormalization.
 
 nn.AdaptiveAvgPool2d((1, 1)) to flatten features.
 
-Classifier with two linear layers, ReLU, and Dropout.
+Classifier with two linear layers, GELU, and Dropout.
 
 ### Hyperparameters:
 
@@ -82,7 +82,7 @@ Dropout: 0.2
 
 Optimizer: optim.Adam
 
-Learning Rate: 0.001
+Learning Rate: 0.0005
 
 Loss Function: nn.CrossEntropyLoss
 
@@ -169,5 +169,4 @@ Predicting abstract traits from handwriting lacks clear, consistent visual patte
 
 **Transfer Learning**: Pre-training on ImageNet (for object recognition) may not adequately prepare the ResNet model for the unique patterns found in handwriting images, limiting the effectiveness of transfer learning for this specific task.
 
-## Training Optimization
-The observed low training accuracy suggests that the models might not be learning effectively from the data, even during the training phase. Further hyperparameter tuning, architectural modifications, or specialized pre-processing techniques for handwriting (beyond standard image augmentation) may be needed.
+
